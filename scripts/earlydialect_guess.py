@@ -51,11 +51,6 @@ m=data_source.split("/")[2]
 """Use the path of the Dataset that needs to the analyzed"""
 
 
-"""Fine Tuning"""
-
-GDI=1
-ILI=0
-AOC=0
 
 
 """Here we explain the fine-tuning with the best pre-trained model that we had obtained."""
