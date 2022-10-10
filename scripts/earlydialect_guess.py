@@ -50,26 +50,6 @@ m=data_source.split("/")[2]
 
 """Use the path of the Dataset that needs to the analyzed"""
 
-GDI_2017=0
-GDI_2018=1
-GDI_2019=0
-ILI=0
-
-
-if GDI_2017:
-  input_dir=os.path.join(root_dir,'gdi-vardial-2017')
-elif GDI_2018:
-  input_dir=os.path.join(root_dir,'gdi-vardial-2018')
-elif GDI_2019:
-  input_dir=os.path.join(root_dir,'gdi-vardial-2019')
-elif ILI:
-  input_dir=os.path.join(root_dir,'IndoAryan')
-elif AOC:
-  input_dir=os.path.join(root_dir,'aoc_data')
-elif ADI:
-    input_dir=os.path.join(root_dir,'Vardial_ADI')
-
-
 
 """Fine Tuning"""
 
@@ -88,7 +68,7 @@ class Model:
         self.MAX_LEN=128
         # self.tokenizer=BertTokenizer.from_pretrained('bert-base-multilingual-cased')
         if GDI:
-            
+            num_labels=4
             self.tokenizer=BertTokenizer.from_pretrained('bert-base-cased')
         elif ILI:
             num_labels=5
@@ -563,7 +543,7 @@ elif ADI:
 
 
 
-#TV=1,#use both training and validation set
+#TV=1 #use both training and validation set
 if TV:
   sentences_train=np.append(sentences_train,sentences_dev)
   
