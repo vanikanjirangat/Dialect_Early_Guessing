@@ -7,4 +7,6 @@ The paper discuss about the experiments, which are primarily data-centric approa
 We used model calibration approaches with BERT-based modelas and found generalizable criteria. (For more details, check the paper).
 
  
+The experimnets are done on four datasets: Swiss German (GDI), Indo-Aryan (ILI), Arabic_Vardial (ADI), Arabic Online Commentary (AOC). The data can be found in the folder *data/*
 
+The main script can be found in folder *scripts/*
