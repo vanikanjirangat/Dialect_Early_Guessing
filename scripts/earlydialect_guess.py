@@ -32,21 +32,39 @@ from sklearn.metrics import accuracy_score, f1_score
 import time
 import datetime
 from transformers import AutoModel, AutoTokenizer, AutoConfig,AutoModelForSequenceClassification
+import json
 
-device_name = 'cuda'
+if torch.cuda.is_available():  
+        device = "cuda:0"
+    else:  
+        device = "cpu" 
+device = torch.device(device) 
+print("device",device)
+
+def json_to_dict(json_set):
+    for k,v in json_set.items():
+        if v == 'False':
+            json_set[k] = False
+        elif v == 'True':
+            json_set[k] = True
+        else:
+            json_set[k] = v
+    return json_set
+with open('./config.json', 'r') as f:
+    params_set = json.load(f)
+params_set = json_to_dict(params_set)
+
+
 
 # specify the data path
-if GDI:
+
+file_path=params_set["data_path"]
+batch_size=params_set["batch_size"]
+epochs=params_set["epochs"]
+
+
     
-    root_dir='./data/GDI/'
-elif ILI:
-    root_dir='./data/ILI/'
-elif AOC:
-    root_dir='./data/AOC/'
-elif ADI:
-    root_dir='./data/ADI/'
-    
-m=data_source.split("/")[2]
+filename=data_source.split("/")[1]
 
 """Use the path of the Dataset that needs to the analyzed"""
 
@@ -62,20 +80,20 @@ class Model:
         self.path=path
         self.MAX_LEN=128
         # self.tokenizer=BertTokenizer.from_pretrained('bert-base-multilingual-cased')
-        if GDI:
+        if filename="GDI":
             num_labels=4
             self.tokenizer=BertTokenizer.from_pretrained('bert-base-cased')
-        elif ILI:
+        elif filename="ILI":
             num_labels=5
             # self.config = AutoConfig.from_pretrained('ai4bharat/indic-bert',num_labels=num_labels)
             self.tokenizer = AutoTokenizer.from_pretrained('neuralspace-reverie/indic-transformers-hi-bert')
             self.config = AutoConfig.from_pretrained('neuralspace-reverie/indic-transformers-hi-bert',num_labels=num_labels)
         
-        elif AOC:
+        elif filename="AOC":
             self.tokenizer = AutoTokenizer.from_pretrained('aubmindlab/bert-base-arabert')
             num_labels=5
             self.config = AutoConfig.from_pretrained('aubmindlab/bert-base-arabert',num_labels=num_labels)
-        elif ADI:
+        elif filename="ADI":
             self.tokenizer = AutoTokenizer.from_pretrained('aubmindlab/bert-base-arabert')
             num_labels=4
             self.config = AutoConfig.from_pretrained('aubmindlab/bert-base-arabert',num_labels=num_labels)
@@ -86,7 +104,7 @@ class Model:
             
     def extract_data(self,name1,name2=None,XY=None):
         
-        if GDI:
+        if filename="GDI":
             file =self.path+name1
             df = pd.read_csv(file, delimiter='\t', header=None, names=['sentence','label'])
             df.replace(np.nan,'NIL', inplace=True)
@@ -97,7 +115,7 @@ class Model:
             if XY==0:
               sentences=[x for i,x in enumerate(sentences) if labels[i]!='XY']
               labels=[x for x in labels if x!='XY']
-        elif ILI:
+        elif filename="ILI":
             file =self.path+name1
             df = pd.read_csv(file, delimiter='\t', header=None, names=['sentence','label'])
             df.replace(np.nan,'NIL', inplace=True)
@@ -105,14 +123,14 @@ class Model:
             sentences = df.sentence.values
           
             labels = df.label.values
-        elif AOC:
+        elif filename="AOC":
             file1 =self.path+name1
             df = pd.read_csv(file1)
             df.replace(np.nan,'NIL', inplace=True)
         
             sentences = df["text"].values
             labels=df["label"].values
-        elif ADI:
+        elif filename="ADI":
             file1 =self.path+name1
             df = pd.read_csv(file1, delimiter='\t', header=None, names=["text_id","text"])
             df.replace(np.nan,'NIL', inplace=True)
@@ -212,7 +230,7 @@ class Model:
     def train_save_load(self,train=1,retrain=0,label_smoothing = -1,XY=None):
       
       
-      WEIGHTS_NAME = "%s_model.bin"%(m)
+      WEIGHTS_NAME = "%s_model.bin"%(filename)
       
 
       OUTPUT_DIR = input_dir
@@ -221,20 +239,28 @@ class Model:
 
         if XY==0:
           # self.model = BertForSequenceClassification.from_pretrained("bert-base-multilingual-cased", num_labels=4)
-          self.model = BertForSequenceClassification.from_pretrained("bert-base-cased", num_labels=4)
-        else:
-          # self.model = BertForSequenceClassification.from_pretrained("bert-base-multilingual-cased", num_labels=5)
-          self.model = BertForSequenceClassification.from_pretrained("bert-base-cased", num_labels=5)
+          if filename="GDI":
+              self.model = BertForSequenceClassification.from_pretrained("bert-base-cased", num_labels=4)
+          else filename="ILI":
+              self.model = BertForSequenceClassification.from_pretrained("neuralspace-reverie/indic-transformers-hi-bert", num_labels=5)
+          else filename="AOC":
+              self.model = BertForSequenceClassification.from_pretrained("aubmindlab/bert-base-arabert", num_labels=5)
+          else filename="ADI":
+              self.model = BertForSequenceClassification.from_pretrained("aubmindlab/bert-base-arabert", num_labels=4)
+        # else:
+        #   # self.model = BertForSequenceClassification.from_pretrained("bert-base-multilingual-cased", num_labels=5)
+        #   self.model = BertForSequenceClassification.from_pretrained("bert-base-cased", num_labels=5)
       else:
         # self.model = BertForSequenceClassification.from_pretrained("bert-base-multilingual-cased", num_labels=4)
         self.model = BertForSequenceClassification.from_pretrained("bert-base-cased", num_labels=4)
         state_dict = torch.load(output_model_file)
         self.model.load_state_dict(state_dict)
-        WEIGHTS_NAME = "%s_model_retrain.bin"%(m)
+        WEIGHTS_NAME = "%s_model_retrain.bin"%(filename)
 
         OUTPUT_DIR = input_dir
         output_model_file = os.path.join(OUTPUT_DIR, WEIGHTS_NAME)
-      self.model.cuda()
+      self.model=self.model.to(device)
+      #self.model.cuda()
       param_optimizer = list(self.model.named_parameters())
       no_decay = ['bias', 'gamma', 'beta']
       optimizer_grouped_parameters = [{'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay_rate': 0.01},{'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)],
@@ -248,8 +274,8 @@ class Model:
       true=[]
       logits_all=[]
       output_dicts = []
-      batch_size=32
-      epochs = 4
+      batch_size=batch_size
+      epochs = epochs
       import time
       start_time = time.time()
       if train==1:
@@ -326,7 +352,7 @@ class Model:
       return output_dicts
 
     def eval(self,label_smoothing = -1):
-      batch_size=32
+      batch_size=batch_size
       eval_loss = 0
       # Put model in evaluation mod
       self.model.eval()
@@ -357,7 +383,7 @@ class Model:
       return eval_loss / len(self.dataloader)
     
     def simple_test(self):
-      batch_size=32
+      batch_size=batch_size
       # Put model in evaluation mod
       self.model.eval()
       # Tracking variables 
@@ -405,7 +431,7 @@ class Model:
       return output_dicts
 
     def test(self,sents):
-      batch_size=32
+      batch_size=batch_size
       # Put model in evaluation mod
       self.model.eval()
       # Tracking variables 
@@ -512,7 +538,7 @@ path=input_dir
 m = Model(path)
 XY=0
 
-if GDI:
+if filename="GDI":
 
     sentences_train,labels_train=m.extract_data('/train.txt',name2=None,XY=0)
     
@@ -522,15 +548,15 @@ if GDI:
     
     
     sentences_test,labels_test=m.extract_data('/gold.txt',name2=None,XY=1)
-elif ILI:
+elif filename="ILI":
     sentences_train,labels_train=m.extract_data('/train.txt',name2=None,XY=0)
     sentences_dev,labels_dev=m.extract_data('/dev.txt',name2=None,XY=0)
     sentences_test,labels_test=m.extract_data('/gold.txt',name2=None,XY=0)
-elif AOC:
+elif filename="AOC":
     sentences_train,labels_train=m.extract_data("/train/MultiTrain.Shuffled.csv",XY=0)
     sentences_dev,labels_dev=m.extract_data("/dev/MultiDev.csv",XY=0)
     sentences_test,labels_test=m.extract_data("/test/MultiTest.csv",XY=0)
-elif ADI:
+elif filename="ADI":
     sentences_train,labels_train=m.extract_data("/train/train.words","/train/train.labels",XY=0)
 
     sentences_dev,labels_dev=m.extract_data("/dev/dev.words","/dev/dev.labels",XY=0)
@@ -556,8 +582,9 @@ m.process_inputs(sentences_test,labels_test)
 
 act_out_test=m.simple_test()
 
-
-# FOR THE INCREMENTAL ANALYSIS
+'''
+FOR THE INCREMENTAL ANALYSIS: 
+'''
 
 def synthesize(s):
 
@@ -568,64 +595,86 @@ def synthesize(s):
     x.append(' '.join(m))
   return x
 from itertools import chain
-sentences_test,labels_test=m.extract_data('/gold.txt',XY=0)
-extract_sents=[]
-labels_sents=[]
-act_ids=[]
-for i,s in enumerate(sentences_test):
-  extract_sents.append(synthesize(s))
-  labels_sents.append([labels_test[i]]*len(extract_sents[i]))
-  act_ids.append([i]*len(extract_sents[i]))
-extract_sents=list(chain(*extract_sents))
-labels_sents=list(chain(*labels_sents))
-act_ids=list(chain(*act_ids))
+#sentences_test,labels_test=m.extract_data('/gold.txt',name2=None,XY=1)
+def extract(sents,labels):
+    extract_sents=[]
+    labels_sents=[]
+    act_ids=[]
+    for i,s in enumerate(sents):
+      extract_sents.append(synthesize(s))
+      labels_sents.append([labels[i]]*len(extract_sents[i]))
+      act_ids.append([i]*len(extract_sents[i]))
+    extract_sents=list(chain(*extract_sents))
+    labels_sents=list(chain(*labels_sents))
+    act_ids=list(chain(*act_ids))
+    print(len(extract_sents),len(labels_sents),len(act_ids))
 
-#sentences_test[0:10]
-
-print(len(extract_sents),len(labels_sents),len(act_ids))
-
-m.process_inputs_test(extract_sents,labels_sents,act_ids)
+    m.process_inputs_test(extract_sents,labels_sents,act_ids)
 
 
-out_test=m.test(extract_sents)
+    out=m.test(extract_sents)
+    return out
+    
+# extract_sents=[]
+# labels_sents=[]
+# act_ids=[]
+# for i,s in enumerate(sentences_test):
+#   extract_sents.append(synthesize(s))
+#   labels_sents.append([labels_test[i]]*len(extract_sents[i]))
+#   act_ids.append([i]*len(extract_sents[i]))
+# extract_sents=list(chain(*extract_sents))
+# labels_sents=list(chain(*labels_sents))
+# act_ids=list(chain(*act_ids))
+
+# #sentences_test[0:10]
+
+# print(len(extract_sents),len(labels_sents),len(act_ids))
+
+# m.process_inputs_test(extract_sents,labels_sents,act_ids)
 
 
-sentences_dev,labels_dev=m.extract_data('/dev.txt',XY=0)
-extract_sents=[]
-labels_sents=[]
-act_ids=[]
-for i,s in enumerate(sentences_dev):
-  extract_sents.append(synthesize(s))
-  labels_sents.append([labels_dev[i]]*len(extract_sents[i]))
-  act_ids.append([i]*len(extract_sents[i]))
-extract_sents=list(chain(*extract_sents))
-labels_sents=list(chain(*labels_sents))
-act_ids=list(chain(*act_ids))
+# out_test=m.test(extract_sents)
+out_test=extract(sentences_test,labels_test)
+out_dev=extract(sentences_dev,labels_dev)
+out_train=extract(sentences_train,labels_train)
+# #sentences_dev,labels_dev=m.extract_data('/dev.txt',name2=None,XY=0)
+# extract_sents=[]
+# labels_sents=[]
+# act_ids=[]
+# for i,s in enumerate(sentences_dev):
+#   extract_sents.append(synthesize(s))
+#   labels_sents.append([labels_dev[i]]*len(extract_sents[i]))
+#   act_ids.append([i]*len(extract_sents[i]))
+# extract_sents=list(chain(*extract_sents))
+# labels_sents=list(chain(*labels_sents))
+# act_ids=list(chain(*act_ids))
 
-m.process_inputs_test(extract_sents,labels_sents,act_ids)
+# m.process_inputs_test(extract_sents,labels_sents,act_ids)
 
 #incremetal processed dev set
-out_dev=m.test(extract_sents)
 
 
-sentences_train,labels_train=m.extract_data('/train.txt',XY=0)
-extract_sents=[]
-labels_sents=[]
-act_ids=[]
-for i,s in enumerate(sentences_train):
-  extract_sents.append(synthesize(s))
-  labels_sents.append([labels_train[i]]*len(extract_sents[i]))
-  act_ids.append([i]*len(extract_sents[i]))
-extract_sents=list(chain(*extract_sents))
-labels_sents=list(chain(*labels_sents))
-act_ids=list(chain(*act_ids))
 
-m.process_inputs_test(extract_sents,labels_sents,act_ids)
+#sentences_train,labels_train=m.extract_data('/train.txt',name2=None,XY=0)
+# extract_sents=[]
+# labels_sents=[]
+# act_ids=[]
+# for i,s in enumerate(sentences_train):
+#   extract_sents.append(synthesize(s))
+#   labels_sents.append([labels_train[i]]*len(extract_sents[i]))
+#   act_ids.append([i]*len(extract_sents[i]))
+# extract_sents=list(chain(*extract_sents))
+# labels_sents=list(chain(*labels_sents))
+# act_ids=list(chain(*act_ids))
+
+# m.process_inputs_test(extract_sents,labels_sents,act_ids)
 
 #incremetal processed train set
-out_train=m.test(extract_sents)
 
-train_path=os.path.join(input_dir,'out_train.json')
+'''
+Saving the outputs frpm the model to json file
+'''
+train_path=os.path.join(input_dir,'out_train_%sfinal.json'%(filename))
 
 import json
 with open(train_path, 'w+') as f:
@@ -633,24 +682,8 @@ with open(train_path, 'w+') as f:
       output_dict_str = json.dumps(output_dict)
       f.write(f'{output_dict_str}\n')
 
-'''
-At which particular fragment lengths maximum confidence was noted.
-Is the confidence maximum always at the original sentence length/raw_max_lenght?
-Is there any average fragment length where maximum confidence/probability is witnessed?
-This may/may not be true label.//
-Is there any average fragment length where the best heuristic is satisfied?
-'''
 
-# import numpy as np
-# np.save('out_test.npy', out_test)
-
-# test_path=os.path.join(input_dir,'out_test_mbertG.json')
-# test_path=os.path.join(input_dir,'out_test_VbertG.json')
-# test_path=os.path.join(input_dir,'out_test_VbertG_nw.json')
-
-# define the path for saving the outputs
-
-test_path=os.path.join(input_dir,'out_test_%sfinal.json'%(m))
+test_path=os.path.join(input_dir,'out_test_%sfinal.json'%(filename))
 
 import json
 with open(test_path, 'w+') as f:
@@ -662,32 +695,16 @@ with open(test_path, 'w+') as f:
 # dev_path=os.path.join(input_dir,'out_dev_VbertG.json')
 # dev_path=os.path.join(input_dir,'out_dev_VbertG_nw.json')
 
-dev_path=os.path.join(input_dir,'out_dev_%sfinal.json'%(m))
+dev_path=os.path.join(input_dir,'out_dev_%sfinal.json'%(filename))
 
 with open(dev_path, 'w+') as f:
   for i, output_dict in enumerate(out_dev1):
       output_dict_str = json.dumps(output_dict)
       f.write(f'{output_dict_str}\n')
 
-# dev_path_act=os.path.join(input_dir,'out_dev_VbertG_nw1.json')
-# with open(dev_path_act, 'w+') as f:
-#   for i, output_dict in enumerate(out_dev1):
-#       output_dict_str = json.dumps(output_dict)
-#       f.write(f'{output_dict_str}\n')
-
-# np.save(os.path.join(input_dir,'out_test1.npy'), out_test)
-
-# import json
-# with open(input_dir+'out_test.csv', 'w') as f:
-#   for i, output_dict in enumerate(out_train):
-#     output_dict_str = json.dumps(output_dict)
-#     f.write(f'{output_dict_str}\n')
-
-# t1=np.load(os.path.join(input_dir,'out_train1.npy'),allow_pickle='TRUE').item()
-
-# t2=np.load(os.path.join(input_dir,'out_test1.npy'),allow_pickle='TRUE').item()
-
-#FOR TEMPERATURE SCALING
+'''
+Code for implementing probability calibrations with temperature scaling
+'''
 
 def load_output(path):
     """Loads output file, wraps elements in tensor."""
@@ -961,7 +978,9 @@ v1,bucket_a,bucket_c,probs=compute(test_path,temperature=ideal_temperature)
 
 #v.keys()
 
-
+'''
+save the final values to the dataframe and apply the following analysis
+'''
 
 df=pd.DataFrame.from_dict(v1)#temperature=1
 df['act_idx']=df['act_ids'].apply(lambda x: int(x))
@@ -992,7 +1011,8 @@ dfX['l2'] = (dfX['preds'] == dfX['preds'].shift(-1))#check label consistency, pr
 dfX['n1']=((dfX['p2'].shift()==True) & (dfX['p3'].shift()==True))#check if previous fragment satisfy this condition
 dfX['n2']=((dfX['p1'].shift()==True) & (dfX['p3'].shift()==True))
 
-"""Experiment with different criteria"""
+"""Experiment with different criteria: In the peper we have done the experiments with all criteria for each dataset and model to understand
+the best possible criteria"""
 
 #ITERATE through the groups and apply heuristics
 dfX=dfX[dfX['length']>=4]
